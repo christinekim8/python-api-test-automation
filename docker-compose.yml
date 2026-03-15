@@ -1,0 +1,71 @@
+version: '3.8'
+
+services:
+  # 1. Database Service: RDBMS that stores all WooCommerce data (products, orders, customers).
+  db:
+    image: mysql:8.0
+    container_name: woo-db
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: password  # Root password for database administration
+      MYSQL_DATABASE: wordpress      # Name of the database to be created on startup
+      MYSQL_USER: user               # Application-level database user
+      MYSQL_PASSWORD: password       # Password for the application-level user
+    volumes:
+      - db_data:/var/lib/mysql       # Persistent storage to preserve data across container restarts
+    networks:
+      - woo-network
+
+  # 2. WordPress Service: The System Under Test (SUT) where the WooCommerce plugin is hosted.
+  wordpress:
+    image: wordpress:latest
+    container_name: woo-app
+    depends_on:
+      - db                           # Ensures the database is up before the application starts
+    ports:
+      - "8080:80"                    # Mapping internal port 80 to localhost:8080 for browser access
+    restart: always
+    environment:
+      WORDPRESS_DB_HOST: db:3306     # Internal hostname of the database service
+      WORDPRESS_DB_USER: user
+      WORDPRESS_DB_PASSWORD: password
+      WORDPRESS_DB_NAME: wordpress
+    volumes:
+      - wp_data:/var/www/html         # Persistence for plugins, themes, and uploaded media files
+    networks:
+      - woo-network
+
+  # 3. phpMyAdmin Service: Web-based GUI for direct database verification (Essential for backend testing).
+  phpmyadmin:
+    image: phpmyadmin:latest
+    container_name: woo-phpmyadmin
+    depends_on:
+      - db
+    ports:
+      - "8081:80"                    # Access via http://localhost:8081 for DB state inspection
+    environment:
+      PMA_HOST: db
+      MYSQL_ROOT_PASSWORD: password
+    networks:
+      - woo-network
+
+  # 4. Test Runner Service: Containerized environment to execute Python/Pytest automation scripts.
+  test-runner:
+    build: .                         # Builds the custom Docker image using the Dockerfile in the root
+    container_name: woo-test-runner
+    depends_on:
+      - wordpress                    # Ensures the target application is available before running tests
+    env_file:
+      - .env                         # Injects sensitive API credentials into the container environment
+    networks:
+      - woo-network
+
+# Volume definitions for data persistence and integrity.
+volumes:
+  db_data:
+  wp_data:
+
+# Network isolation to ensure secure communication between internal services.
+networks:
+  woo-network:
+    driver: bridge
