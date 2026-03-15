@@ -38,15 +38,19 @@ jobs:
       # [Step 5] Orchestration: Launch containers, Auto-configure WP/Woo, and execute test suite
       - name: Spin up Containers and Run Automated Tests
         run: |
-          # 1. Launch infrastructure (DB & WordPress) in detached mode
+          # 1. Launch infrastructure
           docker-compose up -d db wordpress
           
-          # 2. Health check: Wait for WordPress service to stabilize
+          # 2. Wait for stabilization
           echo "Waiting for WordPress service to stabilize..."
           sleep 40 
           
-          # 3. Automated WordPress & WooCommerce Setup
-          # This ensures the API is reachable and doesn't return the "Installation Screen" (HTML)
+          # 3. Install WP-CLI inside the 'woo-app' container (CRITICAL FIX)
+          # The official WordPress image doesn't include WP-CLI by default.
+          echo "Installing WP-CLI inside the container..."
+          docker exec woo-app sh -c "curl -O https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar && chmod +x wp-cli.phar && mv wp-cli.phar /usr/local/bin/wp"
+          
+          # 4. Automated WordPress & WooCommerce Setup
           echo "Starting automated WordPress installation..."
           docker exec woo-app wp core install --url="http://wordpress" --title="Automation Test Store" --admin_user="admin" --admin_password="password" --admin_email="test@example.com" --allow-root
           
@@ -56,7 +60,7 @@ jobs:
           echo "Configuring permalinks for REST API accessibility..."
           docker exec woo-app wp rewrite structure '/%postname%/' --hard --allow-root
           
-          # 4. Execute the test-runner and capture the exit code for CI status
+          # 5. Execute tests
           echo "Launching Pytest suite..."
           docker-compose up --exit-code-from test-runner
 
