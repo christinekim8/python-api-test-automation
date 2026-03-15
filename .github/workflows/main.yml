@@ -35,17 +35,29 @@ jobs:
           echo "CONSUMER_KEY=${{ secrets.CONSUMER_KEY }}" >> .env
           echo "CONSUMER_SECRET=${{ secrets.CONSUMER_SECRET }}" >> .env
 
-      # [Step 5] Orchestration: Launch containers and execute test suite
+      # [Step 5] Orchestration: Launch containers, Auto-configure WP/Woo, and execute test suite
       - name: Spin up Containers and Run Automated Tests
         run: |
-          # Launch infrastructure (DB & WordPress) in detached mode
+          # 1. Launch infrastructure (DB & WordPress) in detached mode
           docker-compose up -d db wordpress
           
-          # Health check: Wait for WordPress to be fully initialized
+          # 2. Health check: Wait for WordPress service to stabilize
           echo "Waiting for WordPress service to stabilize..."
-          sleep 30 
+          sleep 40 
           
-          # Execute the test-runner and capture the exit code for CI status
+          # 3. Automated WordPress & WooCommerce Setup
+          # This ensures the API is reachable and doesn't return the "Installation Screen" (HTML)
+          echo "Starting automated WordPress installation..."
+          docker exec woo-app wp core install --url="http://wordpress" --title="Automation Test Store" --admin_user="admin" --admin_password="password" --admin_email="test@example.com" --allow-root
+          
+          echo "Installing and activating WooCommerce plugin..."
+          docker exec woo-app wp plugin install woocommerce --activate --allow-root
+          
+          echo "Configuring permalinks for REST API accessibility..."
+          docker exec woo-app wp rewrite structure '/%postname%/' --hard --allow-root
+          
+          # 4. Execute the test-runner and capture the exit code for CI status
+          echo "Launching Pytest suite..."
           docker-compose up --exit-code-from test-runner
 
       # [Step 6] Reporting: Generate Allure visual report from test results
