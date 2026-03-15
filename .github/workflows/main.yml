@@ -11,6 +11,8 @@ jobs:
   test-and-report:
     # Operating system for the runner
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     steps:
       # [Step 1] Checkout the repository code to the runner
@@ -35,33 +37,47 @@ jobs:
           echo "CONSUMER_KEY=${{ secrets.CONSUMER_KEY }}" >> .env
           echo "CONSUMER_SECRET=${{ secrets.CONSUMER_SECRET }}" >> .env
 
-      # [Step 5] Orchestration: Launch containers, Auto-configure WP/Woo, and execute test suite
+# [Step 5] Orchestration: Infrastructure Setup, Environment Provisioning, and Test Execution
       - name: Spin up Containers and Run Automated Tests
         run: |
-          # 1. Launch infrastructure
+          # 1. Launch backend infrastructure (Database & WordPress) in detached mode
           docker-compose up -d db wordpress
           
-          # 2. Wait for stabilization
-          echo "Waiting for WordPress service to stabilize..."
-          sleep 40 
+          # 2. Health check: Allow services to fully initialize before configuration
+          echo "Waiting for WordPress and MySQL services to stabilize..."
+          sleep 50 
           
-          # 3. Install WP-CLI inside the 'woo-app' container (CRITICAL FIX)
-          # The official WordPress image doesn't include WP-CLI by default.
-          echo "Installing WP-CLI inside the container..."
+          # 3. Infrastructure Patch: Install WP-CLI and Configure Apache for REST API compatibility
+          # This fixes the 404 Not Found error by enabling mod_rewrite and AllowOverride
+          echo "Installing WP-CLI and configuring Apache web server..."
           docker exec woo-app sh -c "curl -O https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar && chmod +x wp-cli.phar && mv wp-cli.phar /usr/local/bin/wp"
+          docker exec woo-app a2enmod rewrite
+          docker exec woo-app sh -c "echo '<Directory /var/www/html/>\nAllowOverride All\n</Directory>' >> /etc/apache2/apache2.conf"
+          docker exec woo-app service apache2 restart
           
-          # 4. Automated WordPress & WooCommerce Setup
-          echo "Starting automated WordPress installation..."
-          docker exec woo-app wp core install --url="http://wordpress" --title="Automation Test Store" --admin_user="admin" --admin_password="password" --admin_email="test@example.com" --allow-root
+          # 4. Automated Application Provisioning: Install WordPress and WooCommerce
+          echo "Executing automated WordPress core installation..."
+          docker exec woo-app wp core install --url="http://wordpress" --title="CI-Automation-Store" --admin_user="admin" --admin_password="password" --admin_email="test@example.com" --allow-root
           
-          echo "Installing and activating WooCommerce plugin..."
+          echo "Activating WooCommerce plugin..."
           docker exec woo-app wp plugin install woocommerce --activate --allow-root
           
-          echo "Configuring permalinks for REST API accessibility..."
+          echo "Updating permalink structure to support REST API endpoints..."
           docker exec woo-app wp rewrite structure '/%postname%/' --hard --allow-root
           
-          # 5. Execute tests
-          echo "Launching Pytest suite..."
+          # 5. Dynamic Authentication Setup: Inject GitHub Secrets as WooCommerce API Keys
+          # This fixes the 401 Unauthorized error by synchronizing keys between CI environment and Tests
+          echo "Provisioning WooCommerce API credentials from GitHub Secrets..."
+          docker exec woo-app wp woocommerce_api_key create \
+            --user=admin \
+            --description="CI-CD-Access-Key" \
+            --consumer_key=${{ secrets.CONSUMER_KEY }} \
+            --consumer_secret=${{ secrets.CONSUMER_SECRET }} \
+            --permissions=read_write \
+            --allow-root
+          
+          # 6. Test Execution: Trigger the Pytest suite within the test-runner container
+          echo "Starting the Pytest automation suite..."
           docker-compose up --exit-code-from test-runner
 
       # [Step 6] Reporting: Generate Allure visual report from test results
