@@ -37,36 +37,46 @@ jobs:
           echo "CONSUMER_KEY=${{ secrets.CONSUMER_KEY }}" >> .env
           echo "CONSUMER_SECRET=${{ secrets.CONSUMER_SECRET }}" >> .env
 
-# [Step 5] Orchestration: Setup Environment & Execute Tests
+      # [Step 5] Orchestration: Setup Environment & Inject Dynamic Auth
       - name: Spin up Containers and Run Automated Tests
         run: |
-          # 1. Start core services
+          # 1. Start core services in detached mode
           docker-compose up -d db wordpress
           
-          # 2. Health check: Wait for stabilization
+          # 2. Health check: Wait for WordPress and MySQL services to stabilize
           echo "Waiting for WordPress service to stabilize..."
           sleep 50 
           
-          # 3. Environment Provisioning: Install WP-CLI and Configure Apache
+          # 3. Environment Provisioning: Install WP-CLI and configure Apache
+          # This resolves the 404 Not Found error by enabling mod_rewrite
           echo "Installing WP-CLI and enabling Apache rewrite module..."
           docker exec woo-app sh -c "curl -O https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar && chmod +x wp-cli.phar && mv wp-cli.phar /usr/local/bin/wp"
           docker exec woo-app a2enmod rewrite
           docker exec woo-app sh -c "echo '<Directory /var/www/html/>\nAllowOverride All\n</Directory>' >> /etc/apache2/apache2.conf"
           
-          # 4. Safe Restart
+          # 4. Safe Restart: Apply Apache changes without crashing the container
           echo "Restarting WordPress container safely..."
           docker-compose restart wordpress
           sleep 20
           
-          # 5. Application Setup
+          # 5. Application Setup: Install WordPress and WooCommerce core
           echo "Setting up WordPress and WooCommerce..."
           docker exec woo-app wp core install --url="http://wordpress" --title="Automation-Store" --admin_user="admin" --admin_password="password" --admin_email="test@example.com" --allow-root
           docker exec woo-app wp plugin install woocommerce --activate --allow-root
           docker exec woo-app wp rewrite structure '/%postname%/' --hard --allow-root
           
-          # 6. Execute Pytest suite (Force successful exit to generate Allure Report)
+          # 6. Dynamic Authentication: Generate an Application Password for CI
+          # Overwrite the .env file so the test runner uses the newly generated credentials
+          echo "Generating Application Password for CI..."
+          APP_PASS=$(docker exec woo-app wp user application-password create admin "CI_Key" --porcelain --allow-root)
+          
+          echo "BASE_URL=http://wordpress" > .env
+          echo "CONSUMER_KEY=admin" >> .env
+          echo "CONSUMER_SECRET=$APP_PASS" >> .env
+          
+          # 7. Execute Test Suite: Run Pytest and capture the exit code
           echo "Launching Automated Test Suite..."
-          docker-compose up --exit-code-from test-runner || true
+          docker-compose up --exit-code-from test-runner
 
       # [Step 6] Reporting: Generate Allure visual report from test results
       - name: Process Allure Report
