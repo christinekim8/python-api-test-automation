@@ -33,9 +33,9 @@ jobs:
       # This prevents sensitive credentials from being exposed in the source code
       - name: Create Environment File (.env)
         run: |
-          echo "BASE_URL=${{ secrets.BASE_URL }}" >> .env
-          echo "CONSUMER_KEY=${{ secrets.CONSUMER_KEY }}" >> .env
-          echo "CONSUMER_SECRET=${{ secrets.CONSUMER_SECRET }}" >> .env
+          # CI generates credentials dynamically in the provisioning step.
+          # Keep an empty placeholder so docker-compose env_file exists.
+          : > .env
 
       # [Step 5] Orchestration: Setup Environment & Inject Dynamic Auth
       - name: Spin up Containers and Run Automated Tests
@@ -43,9 +43,15 @@ jobs:
           # 1. Start core services in detached mode
           docker-compose up -d db wordpress
           
-          # 2. Health check: Wait for WordPress and MySQL services to stabilize
-          echo "Waiting for WordPress service to stabilize..."
-          sleep 50 
+          # 2. Health check: Wait for WordPress to respond over the network
+          echo "Waiting for WordPress to respond..."
+          for i in $(seq 1 60); do
+            if curl -fsS "http://localhost:8080/wp-login.php" >/dev/null; then
+              echo "WordPress is responding."
+              break
+            fi
+            sleep 2
+          done
           
           # 3. Environment Provisioning: Install WP-CLI and configure Apache
           # This resolves the 404 Not Found error by enabling mod_rewrite
@@ -57,22 +63,41 @@ jobs:
           # 4. Safe Restart: Apply Apache changes without crashing the container
           echo "Restarting WordPress container safely..."
           docker-compose restart wordpress
-          sleep 20
+
+          # Wait again after restart
+          echo "Waiting for WordPress after restart..."
+          for i in $(seq 1 60); do
+            if curl -fsS "http://localhost:8080/wp-login.php" >/dev/null; then
+              echo "WordPress is responding after restart."
+              break
+            fi
+            sleep 2
+          done
           
           # 5. Application Setup: Install WordPress and WooCommerce core
           echo "Setting up WordPress and WooCommerce..."
-          docker exec woo-app wp core install --url="http://wordpress" --title="Automation-Store" --admin_user="admin" --admin_password="password" --admin_email="test@example.com" --allow-root
+          docker exec woo-app wp core install --url="http://wordpress" --title="Automation-Store" --admin_user="admin" --admin_password="password" --admin_email="test@example.com" --skip-email --allow-root || true
           docker exec woo-app wp plugin install woocommerce --activate --allow-root
           docker exec woo-app wp rewrite structure '/%postname%/' --hard --allow-root
           
-          # 6. Dynamic Authentication: Generate an Application Password for CI
-          # Overwrite the .env file so the test runner uses the newly generated credentials
-          echo "Generating Application Password for CI..."
-          APP_PASS=$(docker exec woo-app wp user application-password create admin "CI_Key" --porcelain --allow-root)
-          
-          echo "BASE_URL=http://wordpress" > .env
-          echo "CONSUMER_KEY=admin" >> .env
-          echo "CONSUMER_SECRET=$APP_PASS" >> .env
+          # 6. Dynamic Authentication: Generate WooCommerce REST API keys for CI
+          # We use WooCommerce consumer_key/consumer_secret (query-string auth) to avoid
+          # HTTP Authorization header issues and avoid HTTPS-only Application Password constraints.
+          echo "Generating WooCommerce REST API keys for CI..."
+          CREDS=$(docker exec woo-app wp eval '
+            require_once WP_PLUGIN_DIR . "/woocommerce/includes/class-wc-auth.php";
+            $user = get_user_by("login", "admin");
+            if (!$user) { fwrite(STDERR, "Admin user not found\n"); exit(1); }
+            $keys = WC_Auth::create_keys("CI_Key", $user->ID, "read_write");
+            echo $keys["consumer_key"] . "\n" . $keys["consumer_secret"];
+          ' --allow-root)
+
+          CI_CK=$(echo "$CREDS" | sed -n '1p')
+          CI_CS=$(echo "$CREDS" | sed -n '2p')
+
+          echo "BASE_URL=http://wordpress/wp-json/wc/v3" > .env
+          echo "CONSUMER_KEY=$CI_CK" >> .env
+          echo "CONSUMER_SECRET=$CI_CS" >> .env
           
           # 7. Execute Test Suite: Run Pytest and capture the exit code
           echo "Launching Automated Test Suite..."

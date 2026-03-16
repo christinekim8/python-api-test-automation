@@ -32,6 +32,8 @@ services:
       WORDPRESS_DB_NAME: wordpress
     volumes:
       - wp_data:/var/www/html         # Persistence for plugins, themes, and uploaded media files
+      # Mount the local .htaccess file directly into the container's web root
+      - ./docker-config/.htaccess:/var/www/html/.htaccess
     networks:
       - woo-network
 
