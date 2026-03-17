@@ -1,6 +1,5 @@
 # 🚀 WooCommerce API Automation Testing with Python & Pytest
-[![API Tests](https://github.com/christinekim8/python-api-test-automation/actions/workflows/main.yml/badge.svg)](https://github.com/christinekim8/python-api-test-automation/actions/workflows/main.yml)
-[![Allure Report](https://img.shields.io/badge/Allure_Report-Live-success?logo=githubpages&logoColor=white)](https://christinekim8.github.io/python-api-test-automation/)
+
 ## 📖 Overview
 This project is a high-performance API automation framework designed to validate the **WooCommerce REST API**. Built with **Python** and **Pytest**, it focuses on robust backend validation, data integrity, and end-to-end lifecycle management of e-commerce resources. 
 
