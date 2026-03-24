@@ -1,110 +1,67 @@
-name: WooCommerce API Automation CI/CD Pipeline
+name: WooCommerce API Automation Tests
 
 on:
   push:
-    branches: [main]
+    branches: [ main ]
   pull_request:
-    branches: [main]
+    branches: [ main ]
 
 jobs:
-  test-and-report:
+  test:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
 
     steps:
-      - name: Checkout Source Code
+      # 1. Check out repository code
+      - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+      # 2. Build and start all services
+      - name: Start all services
+        run: docker compose up --build -d
 
-      - name: Install/Verify Docker Compose
-        shell: bash
+      # 3. Wait for test-runner to complete
+      - name: Wait for tests to complete
         run: |
-          sudo curl -L "https://github.com/docker/compose/releases/download/v2.24.5/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-          sudo chmod +x /usr/local/bin/docker-compose
+          echo "Waiting for test-runner to finish..."
+          docker wait woo-test-runner
 
-      - name: Create Environment File (.env)
-        shell: bash
-        run: |
-          # Placeholder; will be overwritten during provisioning.
-          : > .env
-
-      - name: Spin up Containers and Run Automated Tests
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          # 1) Start core services in detached mode
-          docker-compose up -d db wordpress
-
-          # 2) Health check: wait for WordPress to respond on the host port
-          echo "Waiting for WordPress to respond..."
-          for i in $(seq 1 60); do
-            if curl -fsS "http://localhost:8080/wp-login.php" >/dev/null; then
-              echo "WordPress is responding."
-              break
-            fi
-            sleep 2
-          done
-
-          # 3) Provisioning: install WP-CLI and configure Apache rewrite
-          echo "Installing WP-CLI and enabling Apache rewrite module..."
-          docker exec woo-app sh -c "curl -fsS -o wp-cli.phar https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar && chmod +x wp-cli.phar && mv wp-cli.phar /usr/local/bin/wp"
-          docker exec woo-app a2enmod rewrite
-          docker exec woo-app sh -c "echo '<Directory /var/www/html/>\nAllowOverride All\n</Directory>' >> /etc/apache2/apache2.conf"
-
-          # 4) Safe restart
-          echo "Restarting WordPress container safely..."
-          docker-compose restart wordpress
-
-          echo "Waiting for WordPress after restart..."
-          for i in $(seq 1 60); do
-            if curl -fsS "http://localhost:8080/wp-login.php" >/dev/null; then
-              echo "WordPress is responding after restart."
-              break
-            fi
-            sleep 2
-          done
-
-          # 5) App setup: install WP + WooCommerce and set permalinks
-          echo "Setting up WordPress and WooCommerce..."
-          docker exec woo-app wp core install \
-            --url="http://wordpress" \
-            --title="Automation-Store" \
-            --admin_user="admin" \
-            --admin_password="password" \
-            --admin_email="test@example.com" \
-            --skip-email \
-            --allow-root || true
-
-          docker exec woo-app wp plugin install woocommerce --activate --allow-root
-          docker exec woo-app wp rewrite structure '/%postname%/' --hard --allow-root
-
-          # 6) Dynamic Authentication: generate WordPress Application Password for CI
-          echo "Generating Application Password for CI..."
-          APP_PASS=$(docker exec woo-app wp user application-password create admin "CI_Key" --porcelain --allow-root)
-
-          # Write env for the test-runner container
-          echo "BASE_URL=http://wordpress/wp-json/wc/v3" > .env
-          echo "CONSUMER_KEY=admin" >> .env
-          echo "CONSUMER_SECRET=$APP_PASS" >> .env
-
-          # 7) Execute test suite
-          echo "Launching Automated Test Suite..."
-          docker-compose up --exit-code-from test-runner
-
-      - name: Process Allure Report
+      # 4. Print test results
+      - name: Print test logs
         if: always()
-        uses: simple-elf/allure-report-action@master
+        run: docker logs woo-test-runner
+
+      # 5. Copy Allure results from container
+      - name: Copy Allure report
+        if: always()
+        run: |
+          docker cp woo-test-runner:/app/allure-results ./allure-results || true
+          docker cp woo-test-runner:/app/allure-report ./allure-report || true
+
+      # 6. Upload Allure results as artifact
+      - name: Upload Allure results
+        uses: actions/upload-artifact@v4
+        if: always()
         with:
-          allure_results: allure-results
-          allure_history: allure-history
+          name: allure-results
+          path: allure-results/
 
-      - name: Deploy Allure Report to GitHub Pages
+      # 7. Upload Allure report as artifact
+      - name: Upload Allure report
+        uses: actions/upload-artifact@v4
         if: always()
+        with:
+          name: allure-report
+          path: allure-report/
+
+      # 8. Deploy Allure report to GitHub Pages
+      - name: Deploy Allure report to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
+        if: github.ref == 'refs/heads/main'
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: allure-history
+          publish_dir: allure-report
+
+      # 9. Cleanup
+      - name: Cleanup
+        if: always()
+        run: docker compose down -v

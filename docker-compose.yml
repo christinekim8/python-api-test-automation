@@ -1,73 +1,119 @@
-version: '3.8'
-
 services:
-  # 1. Database Service: RDBMS that stores all WooCommerce data (products, orders, customers).
+  # Database service
   db:
     image: mysql:8.0
     container_name: woo-db
     restart: always
     environment:
-      MYSQL_ROOT_PASSWORD: password  # Root password for database administration
-      MYSQL_DATABASE: wordpress      # Name of the database to be created on startup
-      MYSQL_USER: user               # Application-level database user
-      MYSQL_PASSWORD: password       # Password for the application-level user
+      MYSQL_ROOT_PASSWORD: password
+      MYSQL_DATABASE: wordpress
+      MYSQL_USER: user
+      MYSQL_PASSWORD: password
     volumes:
-      - db_data:/var/lib/mysql       # Persistent storage to preserve data across container restarts
+      - db_data:/var/lib/mysql
     networks:
       - woo-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-ppassword"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
 
-  # 2. WordPress Service: The System Under Test (SUT) where the WooCommerce plugin is hosted.
+  # WordPress + WooCommerce service (system under test)
   wordpress:
     image: wordpress:latest
     container_name: woo-app
     depends_on:
-      - db                           # Ensures the database is up before the application starts
+      db:
+        condition: service_healthy
     ports:
-      - "8080:80"                    # Mapping internal port 80 to localhost:8080 for browser access
+      - "8080:80"
     restart: always
     environment:
-      WORDPRESS_DB_HOST: db:3306     # Internal hostname of the database service
+      WORDPRESS_DB_HOST: db:3306
       WORDPRESS_DB_USER: user
       WORDPRESS_DB_PASSWORD: password
       WORDPRESS_DB_NAME: wordpress
+      WORDPRESS_CONFIG_EXTRA: "define('FORCE_SSL_ADMIN', false);"
     volumes:
-      - wp_data:/var/www/html         # Persistence for plugins, themes, and uploaded media files
-      # Mount the local .htaccess file directly into the container's web root
+      - wp_data:/var/www/html
       - ./docker-config/.htaccess:/var/www/html/.htaccess
+      - ./docker-config/apache.conf:/etc/apache2/sites-enabled/000-default.conf
     networks:
       - woo-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
 
-  # 3. phpMyAdmin Service: Web-based GUI for direct database verification (Essential for backend testing).
+  # phpMyAdmin service for database inspection
   phpmyadmin:
     image: phpmyadmin:latest
     container_name: woo-phpmyadmin
     depends_on:
       - db
     ports:
-      - "8081:80"                    # Access via http://localhost:8081 for DB state inspection
+      - "8081:80"
     environment:
       PMA_HOST: db
       MYSQL_ROOT_PASSWORD: password
     networks:
       - woo-network
 
-  # 4. Test Runner Service: Containerized environment to execute Python/Pytest automation scripts.
-  test-runner:
-    build: .                         # Builds the custom Docker image using the Dockerfile in the root
-    container_name: woo-test-runner
+  # WP-CLI setup service: installs WordPress, WooCommerce, and generates API keys
+  wp-setup:
+    image: wordpress:cli
+    container_name: woo-setup
+    user: root
+    restart: "no"
+    extra_hosts:
+      - "localhost:host-gateway"
     depends_on:
-      - wordpress                    # Ensures the target application is available before running tests
-    env_file:
-      - .env                         # Injects sensitive API credentials into the container environment
+      wordpress:
+        condition: service_healthy
+    environment:
+      WORDPRESS_DB_HOST: db:3306
+      WORDPRESS_DB_USER: user
+      WORDPRESS_DB_PASSWORD: password
+      WORDPRESS_DB_NAME: wordpress
+    volumes:
+      - wp_data:/var/www/html
+      - ./scripts/setup-wordpress.sh:/setup.sh
+      - shared_data:/shared
+    entrypoint: ["/bin/bash", "/setup.sh"]
     networks:
       - woo-network
 
-# Volume definitions for data persistence and integrity.
+  # Test runner service: executes pytest and generates Allure report
+  test-runner:
+    build: .
+    container_name: woo-test-runner
+    extra_hosts:
+      - "localhost:host-gateway"
+    depends_on:
+      - wp-setup
+    env_file:
+      - .env
+    volumes:
+      - ./tests:/app/tests
+      - ./allure-results:/app/allure-results
+      - ./allure-report:/app/allure-report
+      - shared_data:/shared
+    command:
+      - sh
+      - -c
+      - "until [ -f /shared/ready ]; do sleep 2; done && cat /shared/.env && cp /shared/.env /app/.env && pytest tests/ --alluredir=/app/allure-results -v && allure generate /app/allure-results --clean -o /app/allure-report"    
+    networks:
+      - woo-network
+
+# Persistent volumes for data integrity across restarts
 volumes:
   db_data:
   wp_data:
+  shared_data:
 
-# Network isolation to ensure secure communication between internal services.
+# Isolated network for secure inter-service communication
 networks:
   woo-network:
     driver: bridge

@@ -117,7 +117,7 @@ class TestProducts:
                 product_api.delete_product(product_id)
                 print(f"[Teardown] Deleted the original test product (ID: {product_id}).")
 
-    def test_product_pagination_integrity(self, product_api):
+    def test_product_pagination_integrity(self, product_api, multiple_products):        
         """
         PRD-011: Advanced Pagination Logic
         Verifies that there is no data overlap between different pages.
