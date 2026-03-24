@@ -93,8 +93,6 @@ services:
       - "localhost:host-gateway"
     depends_on:
       - wp-setup
-    env_file:
-      - .env
     volumes:
       - ./tests:/app/tests
       - ./allure-results:/app/allure-results
@@ -103,7 +101,7 @@ services:
     command:
       - sh
       - -c
-      - "until [ -f /shared/ready ]; do sleep 2; done && cat /shared/.env && cp /shared/.env /app/.env && pytest tests/ --alluredir=/app/allure-results -v && allure generate /app/allure-results --clean -o /app/allure-report"    
+      - "until [ -f /shared/ready ]; do sleep 2; done && cat /shared/.env && cp /shared/.env /app/.env && pytest tests/ --alluredir=/app/allure-results -v && allure generate /app/allure-results --clean -o /app/allure-report"
     networks:
       - woo-network
 
