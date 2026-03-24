@@ -1,0 +1,5 @@
+
+[Test] Verifying product ID: 10
+[Test] Success: Product 'Automated Test Product' verified correctly.
+
+[Teardown] Cleaning up: Deleting product ID 10

@@ -1,0 +1,3 @@
+
+[Running] PRD-005: Boolean Price
+[Success] PRD-005: Boolean Price properly handled. Error message: Invalid parameter(s): regular_price

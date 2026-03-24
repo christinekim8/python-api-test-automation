@@ -1,0 +1,28 @@
+"Status","Start Time","Stop Time","Duration in ms","Parent Suite","Suite","Sub Suite","Test Class","Test Method","Name","Description"
+"passed","Tue Mar 24 05:09:15 UTC 2026","Tue Mar 24 05:09:15 UTC 2026","537","tests","test_products","TestProducts","","","test_create_product_duplicate_sku","
+PRD-007: Duplicate SKU Validation
+Verifies that the system prevents creating two products with the same SKU.
+This test checks business logic and state management.
+"
+"passed","Tue Mar 24 05:09:15 UTC 2026","Tue Mar 24 05:09:15 UTC 2026","134","tests","test_products","TestProducts","","","test_create_product_negative_cases[invalid_payload1-400-PRD-005: Boolean Price]","
+Data-Driven Negative Testing
+Ensures the system correctly handles invalid input by returning appropriate error status codes.
+"
+"passed","Tue Mar 24 05:09:14 UTC 2026","Tue Mar 24 05:09:14 UTC 2026","132","tests","test_products","TestProducts","","","test_list_all_products_status_code","
+PRD-011: Verify that the product list API returns a 200 status code.
+"
+"passed","Tue Mar 24 05:09:14 UTC 2026","Tue Mar 24 05:09:15 UTC 2026","133","tests","test_products","TestProducts","","","test_create_product_negative_cases[invalid_payload0-400-PRD-003: Invalid Name Format]","
+Data-Driven Negative Testing
+Ensures the system correctly handles invalid input by returning appropriate error status codes.
+"
+"passed","Tue Mar 24 05:09:14 UTC 2026","Tue Mar 24 05:09:14 UTC 2026","150","tests","test_products","TestProducts","","","test_create_and_verify_product_lifecycle","
+PRD-001 & PRD-019: Full Lifecycle Test
+1. Create a product (Handled by 'temp_product' fixture)
+2. Verify the product exists and has correct data
+3. Hard delete is performed automatically after this test
+"
+"passed","Tue Mar 24 05:09:16 UTC 2026","Tue Mar 24 05:09:16 UTC 2026","266","tests","test_products","TestProducts","","","test_product_pagination_integrity","
+PRD-011: Advanced Pagination Logic
+Verifies that there is no data overlap between different pages.
+Demonstrates complex data validation using Python sets.
+"

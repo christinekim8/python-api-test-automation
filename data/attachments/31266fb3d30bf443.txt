@@ -1,0 +1,12 @@
+
+[Test] Fetching Page 1 with per_page=2
+[Test] Fetching Page 2 with per_page=2
+[Debug] Page 1 IDs: [14, 13]
+[Debug] Page 2 IDs: [12]
+[Success] Pagination integrity verified. No data overlap found between Page 1 and Page 2.
+
+[Teardown] Deleting pagination product ID 12
+
+[Teardown] Deleting pagination product ID 13
+
+[Teardown] Deleting pagination product ID 14
