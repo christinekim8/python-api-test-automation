@@ -41,7 +41,7 @@ git push
 ```
 
 ## 🧪 Key Test Scenarios & Technical Highlights
-Based on the [Test Scenarios Document](https://docs.google.com/spreadsheets/d/1q9Wi85kXyGIHP1X57NxOVgg75J-sA2PnZ6LEsig01g8/edit?usp=sharing), this suite covers critical business logic:
+> 📋 Full test scenarios documented in **[Test Scenarios Spreadsheet](https://docs.google.com/spreadsheets/d/1q9Wi85kXyGIHP1X57NxOVgg75J-sA2PnZ6LEsig01g8/edit?gid=0#gid=0)** — currently covers the **Products** category.
 
 | Test Case | ID | Description |
 |-----------|-----|-------------|
