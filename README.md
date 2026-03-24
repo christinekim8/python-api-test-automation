@@ -1,53 +1,83 @@
 # 🚀 WooCommerce API Automation Testing with Python & Pytest
+[![Build Status](https://img.shields.io/github/actions/workflow/status/christinekim8/python-api-test-automation/main.yml?style=for-the-badge&logo=github-actions&label=Build)](https://github.com/christinekim8/python-api-test-automation/actions)
+[![Allure Report](https://img.shields.io/badge/Allure%20Report-Live%20Dashboard-yellowgreen?style=for-the-badge&logo=allure)](https://christinekim8.github.io/python-api-test-automation/)
 
 ## 📖 Overview
-This project is a high-performance API automation framework designed to validate the **WooCommerce REST API**. Built with **Python** and **Pytest**, it focuses on robust backend validation, data integrity, and end-to-end lifecycle management of e-commerce resources. 
+This project is a high-performance API automation framework designed to validate the **WooCommerce REST API**. Built with **Python** and **Pytest**, it focuses on robust backend validation, data integrity, and end-to-end lifecycle management of e-commerce resources.
 
 The suite is fully containerized using **Docker** and integrated into a **CI/CD pipeline** with automated **Allure Reporting**, demonstrating a production-ready QA engineering approach.
 
+## 💡 Background & Design Decision
+This project was initially deployed on **AWS EC2** with a full Docker environment. However, running a dedicated EC2 instance 24/7 solely for portfolio purposes introduced unnecessary infrastructure costs.
+
+The architecture was redesigned to be **fully self-contained**: the entire test environment (WordPress, WooCommerce, MySQL) spins up on-demand via Docker Compose — locally or in GitHub Actions — and tears down automatically after tests complete. This approach ensures:
+- ✅ **Zero hosting costs** — no persistent server required
+- ✅ **Runs anywhere** — any machine with Docker Desktop installed
+- ✅ **Fully automated** — triggered on every `git push` via GitHub Actions
+
 ## 🛠 Tech Stack
-* **Language:** Python 3.13
-* **Testing Framework:** Pytest
-* **API Client:** Requests
-* **Infrastructure:** Docker & Docker-Compose
-* **CI/CD:** GitHub Actions
-* **Reporting:** Allure Report & Pytest-HTML
+| Category | Technology |
+|----------|-----------|
+| Language | Python 3.13 |
+| Testing Framework | Pytest |
+| API Client | Requests |
+| Infrastructure | Docker & Docker Compose |
+| CI/CD | GitHub Actions |
+| Reporting | Allure Report |
+| System Under Test | WordPress + WooCommerce (Docker) |
+| Database | MySQL 8.0 (Docker) |
+
+## 🏗 Architecture
+```
+git push
+    └── GitHub Actions
+            ├── docker compose up
+            │       ├── woo-db (MySQL)
+            │       ├── woo-app (WordPress + WooCommerce)
+            │       ├── wp-setup (WP-CLI auto-install)
+            │       └── woo-test-runner (pytest + Allure)
+            ├── Allure Report generated
+            └── Deploy to GitHub Pages
+```
 
 ## 🧪 Key Test Scenarios & Technical Highlights
 Based on the [Test Scenarios Document](https://docs.google.com/spreadsheets/d/1q9Wi85kXyGIHP1X57NxOVgg75J-sA2PnZ6LEsig01g8/edit?usp=sharing), this suite covers critical business logic:
 
-* **Full Resource Lifecycle (PRD-001 & PRD-019):**
-    * Demonstrates advanced **Setup & Teardown** management using Pytest fixtures (`yield`). 
-    * Ensures a clean test environment by automatically creating and permanently removing (Hard Delete) test data.
-* **Data-Driven Negative Testing (PRD-003, 005, 006):**
-    * Utilizes `@pytest.mark.parametrize` to validate multiple edge cases (invalid types, empty fields, malformed JSON) in a single scalable function.
-* **Business Logic & State Management (PRD-007):**
-    * Verifies **Duplicate SKU Validation**, ensuring the system correctly handles state transitions and data uniqueness constraints.
-* **Advanced Pagination Integrity (PRD-011):**
-    * Implements complex logic to verify no data overlap across multiple API pages using Python **Sets** for ID comparison.
-* **Security & Authentication (PRD-017):**
-    * Validates the API's security layer by asserting correct error responses (401 Unauthorized) for invalid credentials.
-
-## 🏗 CI/CD Pipeline & Infrastructure
-* **Dockerized Environment:** The entire test environment, including a local WordPress/WooCommerce instance and the Test Runner, is orchestrated via `docker-compose`.
-* **GitHub Actions CI:** Every `push` or `pull_request` triggers the automated pipeline:
-    1.  Spins up the Docker infrastructure.
-    2.  Executes the Pytest suite.
-    3.  Generates and deploys an **Allure Report** to GitHub Pages for visual stakeholder review.
+| Test Case | ID | Description |
+|-----------|-----|-------------|
+| Full Resource Lifecycle | PRD-001, PRD-019 | Create → Verify → Hard Delete using `yield` fixtures |
+| Negative Testing | PRD-003, PRD-005 | `@pytest.mark.parametrize` for invalid inputs |
+| Duplicate SKU Validation | PRD-007 | Business logic & state management |
+| Pagination Integrity | PRD-011 | No data overlap across pages using Python Sets |
 
 ## 🚀 How to Run Locally
-1.  **Clone the repo:** `git clone https://github.com/christinekim8/python-api-test-automation.git`
-2.  **Setup Environment:** Create a `.env` file with your `CONSUMER_KEY` and `CONSUMER_SECRET`.
-3.  **Run with Docker:**
-    ```bash
-    docker-compose up --build
-    ```
-4.  **View Report:**
-    ```bash
-    allure serve allure-results
 
+### Prerequisites
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) installed
+
+### Run Tests
+
+**Windows:**
+```bat
+run.bat
+```
+
+**Mac/Linux:**
+```bash
+chmod +x run.sh
+./run.sh
+```
+
+That's it! The script will:
+1. Spin up WordPress + WooCommerce + MySQL in Docker
+2. Auto-install WooCommerce and configure API credentials
+3. Run all pytest test cases
+4. Generate Allure report in `allure-report/`
+
+### View Report
+Open `allure-report/index.html` in your browser, or view the latest report on **[GitHub Pages](https://christinekim8.github.io/python-api-test-automation/)**.
 
 ## 🗺 Future Roadmap
-While the current version focuses on the Products category, the following expansions are planned:
-Module Expansion: Implement automated test suites for Orders, Customers, and Coupons APIs.
-Performance Testing: Integrate Locust to simulate high-traffic scenarios on the WooCommerce API.
+- **Module Expansion:** Implement automated test suites for Orders, Customers, and Coupons APIs
+- **Performance Testing:** Integrate Locust to simulate high-traffic scenarios
+- **Contract Testing:** Add Pact for consumer-driven contract testing
