@@ -1,5 +1,9 @@
 @echo off
 echo Starting WooCommerce API Automation Tests...
-docker compose up --build --exit-code-from test-runner --abort-on-container-exit
+docker compose up --build -d
+docker wait woo-test-runner
+docker logs woo-test-runner
+docker compose down
 echo Done!
-echo Open allure-report/index.html in your browser to view the report.
+echo Opening Allure Report...
+start allure-report\index.html
