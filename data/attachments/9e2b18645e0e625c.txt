@@ -1,0 +1,5 @@
+
+[Test] Creating first product with unique SKU: TEST-SKU-D47B39
+[Test] Attempting to create second product with duplicate SKU: TEST-SKU-D47B39
+[Success] Duplicate SKU correctly blocked with message: Invalid or duplicated SKU.
+[Teardown] Deleted the original test product (ID: 11).
