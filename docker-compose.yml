@@ -81,7 +81,7 @@ services:
       - wp_data:/var/www/html
       - ./scripts/setup-wordpress.sh:/setup.sh
       - shared_data:/shared
-    entrypoint: ["/bin/bash", "-c", "sed -i 's/\\r//' /setup.sh && /bin/bash /setup.sh"]
+    entrypoint: ["/bin/bash", "-c", "tr -d '\\r' < /setup.sh | bash"]
     networks:
       - woo-network
 
