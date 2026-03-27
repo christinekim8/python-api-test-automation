@@ -72,10 +72,11 @@ That's it! The script will:
 1. Spin up WordPress + WooCommerce + MySQL in Docker
 2. Auto-install WooCommerce and configure API credentials
 3. Run all pytest test cases
-4. Generate Allure report in `allure-report/`
+4. Generate Allure report
+5. Serve the report at **http://localhost:8888** — opens automatically in your browser
 
-### View Report
-Open `allure-report/index.html` in your browser, or view the latest report on **[GitHub Pages](https://christinekim8.github.io/python-api-test-automation/)**.
+### View Latest Report
+View the latest CI report on **[GitHub Pages](https://christinekim8.github.io/python-api-test-automation/)**.
 
 ## 🗺 Future Roadmap
 - **Module Expansion:** Implement automated test suites for Orders, Customers, and Coupons APIs
